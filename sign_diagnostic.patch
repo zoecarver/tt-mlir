@@ -1,0 +1,45 @@
+--- a/test/ttnn-jit/test_eltwise.py
++++ b/test/ttnn-jit/test_eltwise.py
+@@ -100,10 +100,32 @@
+     print("golden_tensor")
+     print(golden_tensor)
+     print("--------------------------------")
+-
+-    all_close = torch.allclose(
+-        output_tensor.cpu().to_torch(),
+-        golden_tensor.cpu().to_torch(),
++
++    output_torch = output_tensor.cpu().to_torch()
++    golden_torch = golden_tensor.cpu().to_torch()
++
++    all_close = torch.allclose(
++        output_torch,
++        golden_torch,
+         atol=1e-1,
+         rtol=1e-1,
+     )
+     print("all_close", all_close)
++
++    # Diagnostic information for failures
++    if not all_close:
++        diff = torch.abs(output_torch - golden_torch)
++        max_diff = torch.max(diff).item()
++        mean_diff = torch.mean(diff).item()
++        num_different = torch.sum(diff > 1e-6).item()
++        print(f"Max difference: {max_diff}")
++        print(f"Mean difference: {mean_diff}")
++        print(f"Number of elements with diff > 1e-6: {num_different} / {output_torch.numel()}")
++        print(f"Output has NaN: {torch.isnan(output_torch).any()}")
++        print(f"Golden has NaN: {torch.isnan(golden_torch).any()}")
++        print(f"Output has Inf: {torch.isinf(output_torch).any()}")
++        print(f"Golden has Inf: {torch.isinf(golden_torch).any()}")
++        # Show some examples of differences
++        diff_mask = diff > 1e-6
++        if diff_mask.any():
++            diff_indices = torch.nonzero(diff_mask)[:10]  # First 10 differences
++            print("Sample differences:")
++            for idx in diff_indices:
++                i, j = idx[0].item(), idx[1].item()
++                print(f"  [{i},{j}]: output={output_torch[i,j].item():.6f}, golden={golden_torch[i,j].item():.6f}, diff={diff[i,j].item():.6f}")
++
+     assert all_close
