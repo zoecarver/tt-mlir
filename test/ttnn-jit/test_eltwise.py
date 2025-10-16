@@ -133,6 +133,13 @@ def run_op_test(
                 i, j = idx[0].item(), idx[1].item()
                 print(f"  [{i},{j}]: output={output_torch[i,j].item():.6f}, golden={golden_torch[i,j].item():.6f}, diff={diff[i,j].item():.6f}")
 
+            # Also show input values at error positions
+            print("\nInput values at error positions:")
+            for idx in diff_indices[:5]:
+                i, j = idx[0].item(), idx[1].item()
+                input_val = inputs[0].cpu().to_torch()[i,j].item()
+                print(f"  [{i},{j}]: input={input_val:.10e}, output={output_torch[i,j].item():.6f}, golden={golden_torch[i,j].item():.6f}")
+
     assert all_close
 
 
