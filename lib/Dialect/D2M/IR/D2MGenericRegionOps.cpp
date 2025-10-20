@@ -376,6 +376,15 @@ void TileMatmulBlockOp::getEffects(
                        0, true, mlir::SideEffects::DefaultResource::get());
 }
 
+// TileTransposeBlockOp verification
+::mlir::LogicalResult TileTransposeBlockOp::verify() {
+  if (getElemType(getInput().getType()) != getElemType(getOutput().getType())) {
+    return emitOpError("input and output must have same element type");
+  }
+
+  return success();
+}
+
 void TileTransposeBlockOp::getEffects(
     mlir::SmallVectorImpl<
         mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>>
