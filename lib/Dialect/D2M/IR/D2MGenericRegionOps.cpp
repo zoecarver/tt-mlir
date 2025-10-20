@@ -376,7 +376,7 @@ void TileMatmulBlockOp::getEffects(
                        0, true, mlir::SideEffects::DefaultResource::get());
 }
 
-void TileTransposeOp::getEffects(
+void TileTransposeBlockOp::getEffects(
     mlir::SmallVectorImpl<
         mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>>
         &effects) {

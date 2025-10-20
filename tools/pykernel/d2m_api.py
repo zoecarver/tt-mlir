@@ -68,7 +68,7 @@ class TensorBlock:
         in_shape = list(ast_self.type.shape)
         out_shape = in_shape[:-2] + [in_shape[-1], in_shape[-2]]
         out = d2m.empty(RankedTensorType.get(out_shape, ast_self.type.element_type))
-        d2m.tile_transpose(ast_self, out)
+        d2m.tile_transpose_block(ast_self, out)
         return out
 
     def store(ast_self: TensorBlock, rhs: TensorBlock) -> TensorBlock:

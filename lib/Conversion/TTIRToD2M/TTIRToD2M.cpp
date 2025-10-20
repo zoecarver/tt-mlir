@@ -1210,7 +1210,7 @@ private:
 
 namespace {
 class D2MTransposeBlockToLinalgGeneric final
-    : public mlir::OpConversionPattern<d2m::TileTransposeOp>,
+    : public mlir::OpConversionPattern<d2m::TileTransposeBlockOp>,
       D2MNamedRewriterCommon {
 public:
   D2MTransposeBlockToLinalgGeneric(
@@ -1218,14 +1218,14 @@ public:
       ttcore::MemorySpace defaultInputMemSpace,
       ttcore::MemorySpace defaultOutputMemSpace,
       const llvm::SmallVector<int64_t> &targetGridShape, bool ttnnMode, bool collapseTensors)
-      : OpConversionPattern<d2m::TileTransposeOp>(typeConverter, ctx),
+      : OpConversionPattern<d2m::TileTransposeBlockOp>(typeConverter, ctx),
         D2MNamedRewriterCommon(defaultInputMemSpace, defaultOutputMemSpace,
                                targetGridShape, ttnnMode, collapseTensors) {}
 
 private:
   LogicalResult
-  matchAndRewrite(d2m::TileTransposeOp op,
-                  typename d2m::TileTransposeOp::Adaptor adaptor,
+  matchAndRewrite(d2m::TileTransposeBlockOp op,
+                  typename d2m::TileTransposeBlockOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const final {
     if (llvm::any_of(adaptor.getOperands(), [](Value operand) {
           RankedTensorType type =
@@ -1254,9 +1254,10 @@ private:
         affineMaps, iteratorTypes,
         [&](mlir::OpBuilder &bbBuilder, mlir::Location bbLoc,
             mlir::ValueRange bbArgs) {
-          bbBuilder.create<d2m::TileTransposeOp>(
-              bbLoc, bbArgs.take_front(1), bbArgs.take_back(1));
-          bbBuilder.create<mlir::linalg::YieldOp>(bbLoc, bbArgs.take_back(1));
+          // Create TileTransposeOp that returns a value (not DPS)
+          mlir::Value result = bbBuilder.create<d2m::TileTransposeOp>(
+              bbLoc, bbArgs[0]);
+          bbBuilder.create<mlir::linalg::YieldOp>(bbLoc, result);
         });
 
     rewriter.replaceOpWithNewOp<d2m::YieldOp>(op, linalgGeneric.getResult(0));
@@ -1568,6 +1569,7 @@ public:
       return llvm::all_of(op.getOperands(), hasMetalLayout);
     });
     target.addIllegalOp<d2m::TileMatmulBlockOp>();
+    target.addIllegalOp<d2m::TileTransposeBlockOp>();
 
     if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
       signalPassFailure();

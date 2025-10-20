@@ -729,15 +729,15 @@ public:
 } // namespace
 
 namespace {
-class D2MTileTransposeRewriter
-    : public OpConversionPattern<d2m::TileTransposeOp> {
+class D2MTileTransposeBlockRewriter
+    : public OpConversionPattern<d2m::TileTransposeBlockOp> {
 public:
-  using OpConversionPattern<d2m::TileTransposeOp>::OpConversionPattern;
+  using OpConversionPattern<d2m::TileTransposeBlockOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(d2m::TileTransposeOp op, d2m::TileTransposeOpAdaptor adaptor,
+  matchAndRewrite(d2m::TileTransposeBlockOp op, d2m::TileTransposeBlockOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    // TileTransposeOp takes an input and output, like TileMatmulBlockOp.
+    // TileTransposeBlockOp takes an input and output (DPS style).
 
     Value inCB = getCB(rewriter, op.getInput());
 
@@ -759,6 +759,36 @@ public:
                                                dstIdx);
 
     rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+class D2MTileTransposeRewriter
+    : public OpConversionPattern<d2m::TileTransposeOp> {
+public:
+  using OpConversionPattern<d2m::TileTransposeOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(d2m::TileTransposeOp op, d2m::TileTransposeOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    // TileTransposeOp takes an input and returns a result (used inside linalg.generic).
+
+    Value inCB = getCB(rewriter, op.getInput());
+    Value outCB = getCB(rewriter, op.getResult());
+
+    auto insertionPoint = rewriter.getInsertionPoint();
+    setInsertionPointAfterOperands(rewriter, {inCB, outCB},
+                                   /*allowHoisting*/ true);
+    rewriter.create<ttkernel::TransposeInitOp>(op->getLoc(), inCB, outCB);
+    rewriter.setInsertionPoint(insertionPoint->getBlock(), insertionPoint);
+
+    Value tileIndex = getTileIndexFromBlockView(rewriter, op->getLoc(), op.getInput());
+    Value dstIdx = getTileIndexFromBlockView(rewriter, op->getLoc(), op.getResult());
+
+    auto transposeOp = rewriter.create<ttkernel::TransposeTileOp>(
+        op->getLoc(), inCB, tileIndex, dstIdx);
+
+    rewriter.replaceOp(op, transposeOp->getResults());
     return success();
   }
 };
@@ -1445,6 +1475,7 @@ void populateD2MToTTKernelPatterns(
                ttkernel::D2MTilizeUntilizeRewriter<d2m::TileTilizeBlockOp, ttkernel::ExperimentalTilizeBlockOp>,
                ttkernel::D2MTilizeUntilizeRewriter<d2m::TileUntilizeBlockOp, ttkernel::ExperimentalUntilizeBlockOp>,
                ttkernel::D2MTileTransposeRewriter,
+               ttkernel::D2MTileTransposeBlockRewriter,
                ttkernel::D2MTypecastRewriter,
                ttkernel::AcquireDstRewriter,
                ttkernel::MemrefLoadRewriter,

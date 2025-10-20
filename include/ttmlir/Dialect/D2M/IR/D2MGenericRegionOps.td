@@ -542,11 +542,21 @@ def D2M_AcquireDstOp : D2M_GenericRegionComputeOp<"acquire_dst",
     let assemblyFormat = [{ `(` `)` attr-dict `:` type($result) }];
 }
 
-def D2M_TileTransposeOp : D2M_GenericRegionComputeOp<"tile_transpose",
-  [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def D2M_TileTransposeOp : D2M_GenericRegionComputeUnaryDstOp<"tile_transpose", D2M_TileComputeOpTraitBundle> {
     let summary = "D2M Tile Transpose Op";
     let description = [{
         The `tile_transpose` operation computes the transpose of the input tile.
+    }];
+
+    let arguments = (ins TTCore_Tile:$input);
+    let results = (outs TTCore_Tile:$result);
+}
+
+def D2M_TileTransposeBlockOp : D2M_GenericRegionComputeOp<"tile_transpose_block",
+  [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+    let summary = "D2M Tile Transpose Block Op";
+    let description = [{
+        The `tile_transpose_block` operation computes the transpose of the input block.
     }];
 
     let arguments = (ins AnyRankedTensorOrMemRef:$input,
@@ -555,6 +565,8 @@ def D2M_TileTransposeOp : D2M_GenericRegionComputeOp<"tile_transpose",
     let extraClassDeclaration = [{
       MutableOperandRange getDpsInitsMutable() { return getOutputMutable(); }
     }];
+
+    let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
