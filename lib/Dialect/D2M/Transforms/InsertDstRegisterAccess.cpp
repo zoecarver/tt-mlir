@@ -444,6 +444,50 @@ public:
     return true;
   }
 
+  /*
+    Expand a linalg.generic op that contains a tile_transpose into a
+    tile_transpose_block.
+
+    - Uses the linalg.generic and affine semantics to generate copy/pack loops.
+    - Deletes the compute loop nest since tile_transpose_block includes the loops
+    inside it.
+  */
+  static bool rewriteTileTransposeAsTileTransposeBlock(
+      PatternRewriter &rewriter, GenericOp op, Region &region,
+      linalg::GenericOp linalgGenericOp, unsigned dstCapacity, bool &modified) {
+    assert(linalgGenericOp.getInputs().size() == 1 &&
+           "Expected exactly 1 input for tile transpose");
+    assert(linalgGenericOp.getOutputs().size() == 1 &&
+           "Expected exactly 1 output for tile transpose");
+
+    Value inputMemref = linalgGenericOp.getInputs()[0];
+    Value outputMemref = linalgGenericOp.getOutputs()[0];
+
+    rewriter.setInsertionPoint(linalgGenericOp);
+
+    auto linalgLoops = linalg::linalgOpToAffineLoops(rewriter, linalgGenericOp);
+    if (failed(linalgLoops)) {
+      return false;
+    }
+    rewriter.eraseOp(linalgGenericOp);
+    modified |= insertDstRegisterAccess(
+        rewriter, op.getLoc(), region, dstCapacity,
+        !linalgLoops.value().empty() ? linalgLoops.value().front() : nullptr,
+        [&](int64_t index) { return op.getNonParticipatingLoopDims(index); });
+
+    Operation *outerLoop = linalgLoops.value()[0];
+    Block *parentBlk = outerLoop->getBlock();
+    auto insertPos = std::next(Block::iterator(outerLoop));
+
+    rewriter.setInsertionPoint(parentBlk, insertPos);
+    for (Operation *loopOp : llvm::reverse(linalgLoops.value())) {
+      rewriter.eraseOp(loopOp);
+    }
+    rewriter.create<d2m::TileTransposeBlockOp>(op.getLoc(), inputMemref,
+                                               outputMemref);
+    return true;
+  }
+
   static void dataCopyGenerate(PatternRewriter &rewriter, Location loc,
                                Value dst, const CopyInfoMap &copyInfos) {
     for (const auto &[loopNestOrOp, copyInfo] : copyInfos) {
