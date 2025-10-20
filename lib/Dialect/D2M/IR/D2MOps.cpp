@@ -1294,6 +1294,9 @@ void GenericOp::getCanonicalizationPatterns(mlir::RewritePatternSet &patterns,
           if (mlir::isa<d2m::TileMatmulBlockOp>(regionOp)) {
             return false;
           }
+          if (mlir::isa<d2m::TileTransposeBlockOp>(regionOp)) {
+            return false;
+          }
 
           // Don't canonicalize output operands of operations that use the
           // tensor as an output (such as linalg.generic)
