@@ -1255,8 +1255,9 @@ private:
         [&](mlir::OpBuilder &bbBuilder, mlir::Location bbLoc,
             mlir::ValueRange bbArgs) {
           // Create TileTransposeOp that returns a value (not DPS)
+          // bbArgs[0] is the input tile, bbArgs[1] is the output tile
           mlir::Value result = bbBuilder.create<d2m::TileTransposeOp>(
-              bbLoc, bbArgs[0]);
+              bbLoc, bbArgs[1].getType(), bbArgs[0]);
           bbBuilder.create<mlir::linalg::YieldOp>(bbLoc, result);
         });
 
