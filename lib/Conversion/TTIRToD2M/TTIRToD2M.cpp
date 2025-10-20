@@ -1209,6 +1209,71 @@ private:
 } // namespace
 
 namespace {
+class D2MTransposeBlockToLinalgGeneric final
+    : public mlir::OpConversionPattern<d2m::TileTransposeOp>,
+      D2MNamedRewriterCommon {
+public:
+  D2MTransposeBlockToLinalgGeneric(
+      const TypeConverter &typeConverter, mlir::MLIRContext *ctx,
+      ttcore::MemorySpace defaultInputMemSpace,
+      ttcore::MemorySpace defaultOutputMemSpace,
+      const llvm::SmallVector<int64_t> &targetGridShape, bool ttnnMode, bool collapseTensors)
+      : OpConversionPattern<d2m::TileTransposeOp>(typeConverter, ctx),
+        D2MNamedRewriterCommon(defaultInputMemSpace, defaultOutputMemSpace,
+                               targetGridShape, ttnnMode, collapseTensors) {}
+
+private:
+  LogicalResult
+  matchAndRewrite(d2m::TileTransposeOp op,
+                  typename d2m::TileTransposeOp::Adaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const final {
+    if (llvm::any_of(adaptor.getOperands(), [](Value operand) {
+          RankedTensorType type =
+              mlir::cast<RankedTensorType>(operand.getType());
+          return !mlir::isa<ttcore::TileType>(type.getElementType());
+        })) {
+      return llvm::failure();
+    }
+
+    RankedTensorType tensorInput =
+        mlir::cast<RankedTensorType>(adaptor.getInput().getType());
+
+    // Create identity maps for input and output (transpose is element-wise on tiles)
+    SmallVector<mlir::AffineMap> affineMaps;
+    auto identityMap = mlir::AffineMap::getMultiDimIdentityMap(
+        tensorInput.getRank(), rewriter.getContext());
+    affineMaps.push_back(identityMap); // input
+    affineMaps.push_back(identityMap); // output
+
+    SmallVector<mlir::utils::IteratorType> iteratorTypes(
+        tensorInput.getRank(), mlir::utils::IteratorType::parallel);
+
+    auto linalgGeneric = rewriter.create<mlir::linalg::GenericOp>(
+        op.getLoc(), adaptor.getOutput().getType(),
+        SmallVector<Value>{adaptor.getInput()}, adaptor.getOutput(),
+        affineMaps, iteratorTypes,
+        [&](mlir::OpBuilder &bbBuilder, mlir::Location bbLoc,
+            mlir::ValueRange bbArgs) {
+          bbBuilder.create<d2m::TileTransposeOp>(
+              bbLoc, bbArgs.take_front(1), bbArgs.take_back(1));
+          bbBuilder.create<mlir::linalg::YieldOp>(bbLoc, bbArgs.take_back(1));
+        });
+
+    rewriter.replaceOpWithNewOp<d2m::YieldOp>(op, linalgGeneric.getResult(0));
+
+    // HACK - erase duplicate yield ops
+    for (auto user : op.getOutput().getUsers()) {
+      if (mlir::isa<d2m::YieldOp>(user)) {
+        rewriter.eraseOp(user);
+      }
+    }
+
+    return llvm::success();
+  }
+};
+} // namespace
+
+namespace {
 class D2MGenericNonDeviceLayoutRewriter final
     : public mlir::OpConversionPattern<d2m::GenericOp>,
       D2MNamedRewriterCommon {
@@ -1422,6 +1487,7 @@ void populateTTIRToD2MPatterns(
     D2MPermuteRewriter,
 
     D2MMatmulBlockToLinalgGeneric,
+    D2MTransposeBlockToLinalgGeneric,
 
     // Non metal_layout Generic rewriter
     D2MGenericNonDeviceLayoutRewriter
