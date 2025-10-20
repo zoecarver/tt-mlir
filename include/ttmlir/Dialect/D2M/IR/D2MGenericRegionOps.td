@@ -553,7 +553,9 @@ def D2M_TileTransposeOp : D2M_GenericRegionComputeUnaryDstOp<"tile_transpose", D
 }
 
 def D2M_TileTransposeBlockOp : D2M_GenericRegionComputeOp<"tile_transpose_block",
-  [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+  [ DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
+  , D2M_SkipOpEltwiseFusionTrait
+  ]> {
     let summary = "D2M Tile Transpose Block Op";
     let description = [{
         The `tile_transpose_block` operation computes the transpose of the input block.

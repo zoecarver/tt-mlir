@@ -91,6 +91,12 @@ public:
             return;
           }
 
+          if (hasTileTranspose(linalgGenericOp)) {
+            linalgToAffineFailed |= rewriteTileTransposeAsTileTransposeBlock(
+                rewriter, op, region, linalgGenericOp, dstCapacity, modified);
+            return;
+          }
+
           rewriter.setInsertionPoint(linalgGenericOp);
           // Apply linalg to affine loops pass.
           auto linalgLoops =
@@ -383,6 +389,15 @@ public:
       return WalkResult::interrupt();
     });
     return hasTileMatmul;
+  }
+
+  static bool hasTileTranspose(linalg::GenericOp linalgGenericOp) {
+    bool hasTileTranspose = false;
+    linalgGenericOp->walk([&](d2m::TileTransposeOp) {
+      hasTileTranspose = true;
+      return WalkResult::interrupt();
+    });
+    return hasTileTranspose;
   }
   /*
     Expand a linalg.generic op that contains a tile_matmul into a
