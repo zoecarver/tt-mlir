@@ -62,6 +62,15 @@ class TensorBlock:
         d2m.tile_matmul_block(lhs, rhs, out)
         return out
 
+    def transpose(ast_self: TensorBlock) -> TensorBlock:
+        assert isinstance(ast_self.type, RankedTensorType)
+        # Transpose swaps the last two dimensions
+        in_shape = list(ast_self.type.shape)
+        out_shape = in_shape[:-2] + [in_shape[-1], in_shape[-2]]
+        out = d2m.empty(RankedTensorType.get(out_shape, ast_self.type.element_type))
+        d2m.tile_transpose(ast_self, out)
+        return out
+
     def store(ast_self: TensorBlock, rhs: TensorBlock) -> TensorBlock:
         return d2m.store(ast_self, rhs)
 
@@ -517,8 +526,8 @@ def pykernel_gen(
                     pm.enable_ir_printing(
                         # tree_printing_dir_path=print_ir_path,
                         print_after_all=True,
-                        # print_before_all=True,
-                        # print_after_failure=True,
+                        print_before_all=True,
+                        print_after_failure=True,
                         enable_debug_info=True,
                     )
                 pm.run(module.operation)

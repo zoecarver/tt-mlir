@@ -548,8 +548,12 @@ def D2M_TileTransposeOp : D2M_GenericRegionComputeOp<"tile_transpose"> {
         The `tile_transpose` operation computes the transpose of the input tile.
     }];
 
-    let arguments = (ins TTCore_Tile:$input);
-    let results = (outs TTCore_Tile:$result);
+    let arguments = (ins AnyRankedTensorOrMemRef:$input,
+                         AnyRankedTensorOrMemRef:$output);
+
+    let extraClassDeclaration = [{
+      MutableOperandRange getDpsInitsMutable() { return getOutputMutable(); }
+    }];
 }
 
 //===----------------------------------------------------------------------===//

@@ -1037,10 +1037,10 @@ public:
               linalgIteratorTypes,
               [&](mlir::OpBuilder &bbBuilder, mlir::Location bbLoc,
                   mlir::ValueRange bbArgs) {
-                mlir::Value yield = bbBuilder.create<d2m::TileTransposeOp>(
-                    bbLoc, bbArgs.take_back(1).getTypes(),
-                    bbArgs.take_front(1));
-                bbBuilder.create<mlir::linalg::YieldOp>(bbLoc, yield);
+                // TileTransposeOp now takes input and output like other DPS ops
+                bbBuilder.create<d2m::TileTransposeOp>(
+                    bbLoc, bbArgs.take_front(1), bbArgs.take_back(1));
+                bbBuilder.create<mlir::linalg::YieldOp>(bbLoc, bbArgs.take_back(1));
               });
 
           builder.create<d2m::YieldOp>(bodyLoc, linalgGeneric->getResults());

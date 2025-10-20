@@ -83,8 +83,9 @@ def flash_attention_simple(Q, K, V, out, block_factors=None, grid=None):
             # Reserve output BEFORE computation (to ensure memref is allocated)
             out_block_mem = out_cb.reserve()
 
-            # Placeholder: simplest possible computation
-            temp = Q_block_mem @ K_block_mem
+            # Test transpose: compute Q @ K^T
+            K_transposed = K_block_mem.transpose()
+            temp = Q_block_mem @ K_transposed
 
             # Store result
             out_block_mem.store(temp)

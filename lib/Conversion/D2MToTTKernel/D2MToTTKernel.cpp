@@ -737,12 +737,11 @@ public:
   LogicalResult
   matchAndRewrite(d2m::TileTransposeOp op, d2m::TileTransposeOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    // TileTransposeOp is a unary op that takes an input tile and produces
-    // an output tile.
+    // TileTransposeOp takes an input and output, like TileMatmulBlockOp.
 
-    Value inCB = getInCB(rewriter, op);
+    Value inCB = getCB(rewriter, op.getInput());
 
-    Value outCB = getOutCB(rewriter, op);
+    Value outCB = getCB(rewriter, op.getOutput());
 
     auto insertionPoint = rewriter.getInsertionPoint();
     setInsertionPointAfterOperands(rewriter, {inCB, outCB},
@@ -751,10 +750,10 @@ public:
     rewriter.setInsertionPoint(insertionPoint->getBlock(), insertionPoint);
 
     // Get the tile index from the input operand.
-    Value tileIndex = adaptor.getInput();
+    Value tileIndex = resolveTileIndex(rewriter, op->getLoc(), adaptor.getInput());
 
-    // Get the destination index where the result will be stored.
-    Value dstIdx = getDstIdxFromResult(op.getResult());
+    // Get the destination index from the output operand.
+    Value dstIdx = resolveTileIndex(rewriter, op->getLoc(), adaptor.getOutput());
 
     rewriter.create<ttkernel::TransposeTileOp>(op->getLoc(), inCB, tileIndex,
                                                dstIdx);
