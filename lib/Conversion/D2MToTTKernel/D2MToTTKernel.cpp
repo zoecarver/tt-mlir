@@ -197,7 +197,8 @@ static void setInsertionPointAfterOperands(OpBuilder &rewriter,
   for (Value operand : operands) {
     Operation *definingOp = operand.getDefiningOp();
     if (!latestDefOp ||
-        (definingOp && !definingOp->isBeforeInBlock(latestDefOp))) {
+        (definingOp && definingOp->getBlock() && latestDefOp->getBlock() &&
+         !definingOp->isBeforeInBlock(latestDefOp))) {
       latestDefOp = definingOp;
     }
   }
@@ -208,7 +209,8 @@ static void setInsertionPointAfterOperands(OpBuilder &rewriter,
   // topological order.
   auto currentInsertionPoint = rewriter.getInsertionPoint();
   if (allowHoisting ||
-      (latestDefOp->getBlock() == currentInsertionPoint->getBlock() &&
+      (latestDefOp->getBlock() && currentInsertionPoint->getBlock() &&
+       latestDefOp->getBlock() == currentInsertionPoint->getBlock() &&
        currentInsertionPoint->isBeforeInBlock(latestDefOp))) {
     rewriter.setInsertionPointAfter(latestDefOp);
   }
