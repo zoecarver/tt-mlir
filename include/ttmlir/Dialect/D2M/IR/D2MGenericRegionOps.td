@@ -542,7 +542,8 @@ def D2M_AcquireDstOp : D2M_GenericRegionComputeOp<"acquire_dst",
     let assemblyFormat = [{ `(` `)` attr-dict `:` type($result) }];
 }
 
-def D2M_TileTransposeOp : D2M_GenericRegionComputeOp<"tile_transpose"> {
+def D2M_TileTransposeOp : D2M_GenericRegionComputeOp<"tile_transpose",
+  [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let summary = "D2M Tile Transpose Op";
     let description = [{
         The `tile_transpose` operation computes the transpose of the input tile.
