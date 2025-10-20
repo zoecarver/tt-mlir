@@ -84,7 +84,7 @@ def flash_attention_simple(Q, K, V, out, block_factors=None, grid=None):
             out_block_mem = out_cb.reserve()
 
             # Placeholder: simplest possible computation
-            temp = Q_block_mem + K_block_mem
+            temp = Q_block_mem @ K_block_mem
 
             # Store result
             out_block_mem.store(temp)
