@@ -750,10 +750,10 @@ public:
     rewriter.setInsertionPoint(insertionPoint->getBlock(), insertionPoint);
 
     // Get the tile index from the input operand.
-    Value tileIndex = resolveTileIndex(rewriter, op->getLoc(), adaptor.getInput());
+    Value tileIndex = getTileIndexFromBlockView(rewriter, op->getLoc(), op.getInput());
 
     // Get the destination index from the output operand.
-    Value dstIdx = resolveTileIndex(rewriter, op->getLoc(), adaptor.getOutput());
+    Value dstIdx = getTileIndexFromBlockView(rewriter, op->getLoc(), op.getOutput());
 
     rewriter.create<ttkernel::TransposeTileOp>(op->getLoc(), inCB, tileIndex,
                                                dstIdx);
