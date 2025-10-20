@@ -772,9 +772,10 @@ public:
   matchAndRewrite(d2m::TileTransposeOp op, d2m::TileTransposeOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     // TileTransposeOp takes an input and returns a result (used inside linalg.generic).
+    // After bufferization, the result doesn't exist - we search for the output store.
 
     Value inCB = getCB(rewriter, op.getInput());
-    Value outCB = getCB(rewriter, op.getResult());
+    Value outCB = getOutCB(rewriter, op);
 
     auto insertionPoint = rewriter.getInsertionPoint();
     setInsertionPointAfterOperands(rewriter, {inCB, outCB},
@@ -783,12 +784,11 @@ public:
     rewriter.setInsertionPoint(insertionPoint->getBlock(), insertionPoint);
 
     Value tileIndex = getTileIndexFromBlockView(rewriter, op->getLoc(), op.getInput());
-    Value dstIdx = getTileIndexFromBlockView(rewriter, op->getLoc(), op.getResult());
+    Value dstIdx = getTileIndexFromBlockView(rewriter, op->getLoc(), adaptor.getInput());
 
-    auto transposeOp = rewriter.create<ttkernel::TransposeTileOp>(
-        op->getLoc(), inCB, tileIndex, dstIdx);
+    rewriter.create<ttkernel::TransposeTileOp>(op->getLoc(), inCB, tileIndex, dstIdx);
 
-    rewriter.replaceOp(op, transposeOp->getResults());
+    rewriter.eraseOp(op);
     return success();
   }
 };
