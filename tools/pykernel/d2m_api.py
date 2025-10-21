@@ -534,8 +534,8 @@ def pykernel_gen(
                 print(module)
                 bin = ttmetal_to_flatbuffer_bin(module)
 
-                # print("RUNTIME DISABLED")
-                # return
+                print("RUNTIME DISABLED")
+                return
 
                 if runtime is None or binary is None:
                     print("Warning: runtime not enabled, returning compiled object")
