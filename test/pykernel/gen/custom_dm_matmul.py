@@ -53,7 +53,7 @@ def matmul(lhs, rhs, out, block_factors=None, grid=None):
                 for n in range(N):
                     rhs_shard = rhs_cb.pop()
                     out_shard = out_cb.reserve()
-                    out = lhs_shard + rhs_shard
+                    out = lhs_shard @ rhs_shard
                     out_shard.store(out)
                     out_cb.pop() # compute needs to clear the output
 
