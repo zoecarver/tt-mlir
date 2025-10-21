@@ -119,6 +119,11 @@ public:
       D2MInsertExplicitStreams>::D2MInsertExplicitStreamsBase;
 
   void runOnOperation() final {
+    // TODO: This pass is now redundant for DSL-generated code. Streams are
+    // created directly in Python via stream_layout ops. This pass remains for
+    // backward compatibility but is disabled by default.
+    return;
+
     RewritePatternSet patterns(&getContext());
     patterns.add<D2MInsertExplicitStreamsRewriter>(&getContext());
     walkAndApplyPatterns(getOperation(), std::move(patterns));

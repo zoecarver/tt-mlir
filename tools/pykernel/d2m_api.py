@@ -200,6 +200,19 @@ class Program:
         return self
 
 
+def _create_stream_layout_for_input(ctx, input_arg):
+    """
+    Create a stream_layout op for the given input argument.
+
+    This creates a placeholder storage buffer. The d2m-allocate pass will create
+    new L1 allocations and use the stream as a data source via d2m.to_layout ops.
+    """
+    input_type = input_arg.type
+    storage = d2m.EmptyOp(input_type)
+    stream = d2m.StreamLayoutOp(input_type, input_arg, storage.result)
+    return stream.result
+
+
 def _affine_map_from_lambda(fn):
     class Dim:
         def __init__(self, position, name):
@@ -231,13 +244,13 @@ def _affine_map_from_lambda(fn):
 def _create_generic_func(
     ctx,
     name,
-    stream_func_arg_attrs,
     grid,
     block_factors,
     indexing_maps,
     iterator_types,
     compiled_threads,
     num_outs,
+    is_stream,
 ):
     # Flatten the block factors if need be.
     if (
@@ -261,11 +274,17 @@ def _create_generic_func(
     arg_types = ordered_tensor_args
     ret_type = ordered_tensor_args[-1]
     func_entry = func.FuncOp(name=name, type=(arg_types, [ret_type]))
-    func_entry.arg_attrs = stream_func_arg_attrs
     func_bb = func_entry.add_entry_block()
     with InsertionPoint(func_bb):
         inputs = func_bb.arguments[:-num_outs]
         outputs = func_bb.arguments[-num_outs:]
+
+        # Wrap inputs that need streaming with stream_layout ops.
+        inputs = [
+            _create_stream_layout_for_input(ctx, inp) if is_stream[i] else inp
+            for i, inp in enumerate(inputs)
+        ]
+
         threads = ArrayAttr.get(
             [
                 ct.func_entry.attributes[d2m.ir.ThreadAttr.name]
@@ -470,10 +489,7 @@ def pykernel_gen(
 
                 streams = set().union(*[ct.streams for ct in compiled_threads])
                 positional_arg_names = list(f_params.keys())[: len(args)]
-                stream_func_arg_attrs = [
-                    DictAttr.get({"d2m.stream": BoolAttr.get(p in streams)})
-                    for p in positional_arg_names
-                ]
+                is_stream = [p in streams for p in positional_arg_names]
                 assert (
                     positional_arg_names[-num_outs] not in streams
                 ), "Output streaming not supported"
@@ -482,13 +498,13 @@ def pykernel_gen(
                     _create_generic_func(
                         ctx,
                         f.__name__,
-                        stream_func_arg_attrs,
                         grid,
                         block_factors,
                         indexing_maps,
                         iterator_types,
                         compiled_threads,
                         num_outs,
+                        is_stream,
                     )
 
                 print(module)
