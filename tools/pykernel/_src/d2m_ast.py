@@ -59,6 +59,7 @@ class D2MGenericCompiler(TTCompilerBase):
                 raise TypeError("All kernel arguments must have a type annotation")
             elif arg.annotation.id == "TensorBlock":
                 shape = self.args[i].shape
+                print(f"[SHAPE DEBUG d2m_ast.py:61] TensorBlock arg {i}: shape = {shape}, type = {type(shape)}")
                 dtype = F32Type.get(self.ctx)
                 from ..d2m_api import create_metal_layout
 
@@ -82,15 +83,8 @@ class D2MGenericCompiler(TTCompilerBase):
                     raise RuntimeError("Failed to downcast MetalLayoutAttr")
                 device_shape = typed_layout.getDeviceShape(grid_shape, tile_shape)
 
-                # For 1x1 grid, use logical shape with proper tile counting (like builder_utils.py)
-                if self.grid == [1, 1] or self.grid == (1, 1):
-                    if self.tiled:
-                        # For tiled layouts, calculate tile count for last 2 dimensions
-                        tile_count_h = (shape[-2] + 31) // 32
-                        tile_count_w = (shape[-1] + 31) // 32
-                        device_shape = list(shape[:-2]) + [tile_count_h, tile_count_w]
-                    else:
-                        device_shape = list(shape)
+                print(f"[SHAPE DEBUG d2m_ast.py:61] TensorBlock device_shape from getDeviceShape: {device_shape}")
+
                 element_type = (
                     ttcore.ir.TileType.get(self.ctx, 32, 32, ttcore.DataType.Float32)
                     if self.tiled
@@ -100,24 +94,42 @@ class D2MGenericCompiler(TTCompilerBase):
                 func_operand_types.append(tensor_type)
             elif arg.annotation.id == "CircularBuffer":
                 shape = self.args[i].shape
+                print(f"[SHAPE DEBUG d2m_ast.py:103] CircularBuffer arg {i}: shape = {shape}, type = {type(shape)}")
                 dtype = F32Type.get(self.ctx)
+                from ..d2m_api import create_metal_layout
 
-                # CircularBuffer should create local memrefs (without MetalLayoutAttr)
-                # for use in DMA operations. The underlying memref should be local L1.
-                if self.tiled:
-                    # For tiled layouts, calculate tile count for last 2 dimensions
-                    tile_count_h = (shape[-2] + 31) // 32
-                    tile_count_w = (shape[-1] + 31) // 32
-                    device_shape = list(shape[:-2]) + [tile_count_h, tile_count_w]
-                    element_type = ttcore.ir.TileType.get(
-                        self.ctx, 32, 32, ttcore.DataType.Float32
-                    )
+                # Create layout to compute device shape (for shard calculation)
+                layout = create_metal_layout(
+                    self.ctx, shape, self.grid, self.tiled, self.memory_space
+                )
+                tile_shape = [32, 32] if self.tiled else [1, 1]
+
+                # Create grid shape that matches logical rank
+                logical_rank = len(shape)
+                if len(self.grid) == 2 and logical_rank == 2:
+                    grid_shape = list(self.grid)
                 else:
-                    device_shape = list(shape)
-                    element_type = dtype
+                    grid_shape = list(self.grid) + [1] * (logical_rank - len(self.grid))
 
-                # Create local memref type (no MetalLayoutAttr) for CircularBuffer
-                tensor = RankedTensorType.get(device_shape, element_type, None)
+                # Get full device shape to extract shard portion
+                typed_layout = ttcore.ir.MetalLayoutAttr.maybe_downcast(layout)
+                if typed_layout is None:
+                    raise RuntimeError("Failed to downcast MetalLayoutAttr")
+                device_shape = typed_layout.getDeviceShape(grid_shape, tile_shape)
+
+                # CircularBuffer is LOCAL per-core - use only shard shape (second half)
+                shard_shape = device_shape[len(device_shape) // 2:]
+
+                print(f"[SHAPE DEBUG d2m_ast.py:103] CircularBuffer full device_shape: {device_shape}, shard_shape: {shard_shape}")
+
+                element_type = (
+                    ttcore.ir.TileType.get(self.ctx, 32, 32, ttcore.DataType.Float32)
+                    if self.tiled
+                    else dtype
+                )
+
+                # Create tensor WITHOUT MetalLayoutAttr - CircularBuffer is local!
+                tensor = RankedTensorType.get(shard_shape, element_type, None)
                 func_operand_types.append(d2m.ir.CBType.get(self.ctx, tensor))
             elif arg.annotation.id == "Semaphore":
                 func_operand_types.append(d2m.ir.SemaphoreType.get(self.ctx))
@@ -154,6 +166,7 @@ class D2MGenericCompiler(TTCompilerBase):
                         IndexType.get(self.ctx), val
                     )
                 elif isinstance(val, Stream):
+                    print(f"[SHAPE DEBUG d2m_ast.py:156] Stream '{name}': val.shape = {val.shape}, type = {type(val.shape)}")
                     with InsertionPoint.at_block_begin(self.module.body):
                         from ..d2m_api import create_metal_layout
 
@@ -185,18 +198,8 @@ class D2MGenericCompiler(TTCompilerBase):
                             grid_shape, tile_shape
                         )
 
-                        # For 1x1 grid, use logical shape with proper tile counting (like builder_utils.py)
-                        if self.grid == [1, 1] or self.grid == (1, 1):
-                            if self.tiled:
-                                # For tiled layouts, calculate tile count for last 2 dimensions
-                                tile_count_h = (val.shape[-2] + 31) // 32
-                                tile_count_w = (val.shape[-1] + 31) // 32
-                                device_shape = list(val.shape[:-2]) + [
-                                    tile_count_h,
-                                    tile_count_w,
-                                ]
-                            else:
-                                device_shape = list(val.shape)
+                        print(f"[SHAPE DEBUG d2m_ast.py:186] Stream '{name}' device_shape from getDeviceShape: {device_shape}")
+
                         element_type = (
                             ttcore.ir.TileType.get(
                                 self.ctx, 32, 32, ttcore.DataType.Float32

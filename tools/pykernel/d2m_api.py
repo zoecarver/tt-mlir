@@ -320,6 +320,9 @@ def _create_generic_func(
     iterator_types,
     compiled_threads,
     num_outs,
+    user_args,  # Original torch tensor arguments
+    tiled,
+    memory_space,
 ):
     # Flatten the block factors if need be.
     if (
@@ -334,12 +337,37 @@ def _create_generic_func(
     # Some passes still rely on the compute thread being last.
     compiled_threads.sort(key=lambda ct: ct.kernel_type == "compute")
 
+    # Create proper function argument types from original user arguments
+    # instead of extracting from CircularBuffer types
     ordered_tensor_args = []
-    for t in compiled_threads[0].func_entry.arguments.types:
-        if isinstance(t, RankedTensorType):
-            ordered_tensor_args.append(t)
-        elif str(t).startswith("!d2m.cb"):
-            ordered_tensor_args.append(d2m.ir.CBType.cast(t).getUnderlying())
+    for arg in user_args:
+        shape = arg.shape
+        dtype = F32Type.get(ctx)
+
+        # Create MetalLayoutAttr for distributed tensor
+        layout = create_metal_layout(ctx, shape, grid, tiled, memory_space)
+        tile_shape = [32, 32] if tiled else [1, 1]
+
+        logical_rank = len(shape)
+        if len(grid) == 2 and logical_rank == 2:
+            grid_shape = list(grid)
+        else:
+            grid_shape = list(grid) + [1] * (logical_rank - len(grid))
+
+        typed_layout = ttcore.ir.MetalLayoutAttr.maybe_downcast(layout)
+        if typed_layout is None:
+            raise RuntimeError("Failed to downcast MetalLayoutAttr")
+        device_shape = typed_layout.getDeviceShape(grid_shape, tile_shape)
+
+        element_type = (
+            ttcore.ir.TileType.get(ctx, 32, 32, ttcore.DataType.Float32)
+            if tiled
+            else dtype
+        )
+
+        tensor_type = RankedTensorType.get(device_shape, element_type, layout)
+        ordered_tensor_args.append(tensor_type)
+
     arg_types = ordered_tensor_args
     ret_type = ordered_tensor_args[-1]
     func_entry = func.FuncOp(name=name, type=(arg_types, [ret_type]))
@@ -589,6 +617,9 @@ def pykernel_gen(
                         iterator_types,
                         compiled_threads,
                         num_outs,
+                        args,  # Pass original user arguments
+                        tiled,
+                        memory_space,
                     )
 
                 print(module)

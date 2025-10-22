@@ -169,7 +169,53 @@ protected:
     }
 
     auto tensorType = mlir::cast<mlir::RankedTensorType>(value.getType());
-    SmallVector<int64_t> logicalShape(tensorType.getShape());
+
+    // Check if tensor already has a MetalLayoutAttr and extract logical shape
+    SmallVector<int64_t> logicalShape;
+    if (auto existingLayout = mlir::dyn_cast_or_null<ttcore::MetalLayoutAttr>(
+            tensorType.getEncoding())) {
+      // Tensor already has a layout - use its logical shape
+      logicalShape = llvm::to_vector(existingLayout.getLogicalShape());
+
+      // DEBUG: Log that we found an existing layout
+      llvm::errs() << "[SHAPE DEBUG TTIRToD2M.cpp:175] Found existing MetalLayoutAttr:\n";
+      llvm::errs() << "  Tensor shape (device): [";
+      for (size_t i = 0; i < tensorType.getShape().size(); ++i) {
+        if (i > 0) llvm::errs() << ", ";
+        llvm::errs() << tensorType.getShape()[i];
+      }
+      llvm::errs() << "]\n";
+      llvm::errs() << "  Extracted logical shape: [";
+      for (size_t i = 0; i < logicalShape.size(); ++i) {
+        if (i > 0) llvm::errs() << ", ";
+        llvm::errs() << logicalShape[i];
+      }
+      llvm::errs() << "]\n";
+    } else {
+      // No existing layout - check if this is already a local tensor
+      auto tensorShape = tensorType.getShape();
+
+      // If tensor has rank 2 and small shape, it's likely already a shard - skip layout creation
+      // This handles CircularBuffer contents and other local tensors
+      if (tensorShape.size() == 2) {
+        llvm::errs() << "[SHAPE DEBUG TTIRToD2M.cpp:175] No layout on rank-2 tensor:\n";
+        llvm::errs() << "  Shape: [" << tensorShape[0] << ", " << tensorShape[1] << "]\n";
+        llvm::errs() << "  Skipping layout creation - assuming local tensor\n";
+        return value;  // Return unchanged - it's already local
+      }
+
+      // For higher rank tensors without layout, use shape as logical shape
+      logicalShape = SmallVector<int64_t>(tensorType.getShape());
+
+      // DEBUG: Log that we're using tensor shape as logical shape
+      llvm::errs() << "[SHAPE DEBUG TTIRToD2M.cpp:175] No existing layout:\n";
+      llvm::errs() << "  Using tensor shape as logical shape: [";
+      for (size_t i = 0; i < logicalShape.size(); ++i) {
+        if (i > 0) llvm::errs() << ", ";
+        llvm::errs() << logicalShape[i];
+      }
+      llvm::errs() << "]\n";
+    }
 
     Type elementType = tensorType.getElementType();
     llvm::SmallVector<int64_t> tileShape;

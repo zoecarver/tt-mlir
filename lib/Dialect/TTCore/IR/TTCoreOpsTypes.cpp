@@ -736,6 +736,27 @@ static llvm::SmallVector<int64_t> applyCollapsedIntervalsAndAlignments(
   assert(shape.size() == alignments.size() &&
          "Shape and alignments must have same size");
 
+  // DEBUG: Log input to applyCollapsedIntervalsAndAlignments
+  llvm::errs() << "[SHAPE DEBUG] applyCollapsedIntervalsAndAlignments:\n";
+  llvm::errs() << "  Input shape: [";
+  for (size_t i = 0; i < shape.size(); ++i) {
+    if (i > 0) llvm::errs() << ", ";
+    llvm::errs() << shape[i];
+  }
+  llvm::errs() << "]\n";
+  llvm::errs() << "  Normalized intervals: [";
+  for (size_t i = 0; i < normalizedIntervals.size(); ++i) {
+    if (i > 0) llvm::errs() << ", ";
+    llvm::errs() << normalizedIntervals[i];
+  }
+  llvm::errs() << "]\n";
+  llvm::errs() << "  Alignments: [";
+  for (size_t i = 0; i < alignments.size(); ++i) {
+    if (i > 0) llvm::errs() << ", ";
+    llvm::errs() << alignments[i];
+  }
+  llvm::errs() << "]\n";
+
   llvm::SmallVector<int64_t> resultShape;
 
   // Process with collapse intervals.
@@ -789,15 +810,46 @@ static llvm::SmallVector<int64_t> applyCollapsedIntervalsAndAlignments(
     resultShape.push_back(ttmlir::utils::alignUp(shape[i], alignments[i]));
   }
 
+  // DEBUG: Log output
+  llvm::errs() << "  → Collapsed shape: [";
+  for (size_t i = 0; i < resultShape.size(); ++i) {
+    if (i > 0) llvm::errs() << ", ";
+    llvm::errs() << resultShape[i];
+  }
+  llvm::errs() << "]\n";
+
   return resultShape;
 }
 
 llvm::SmallVector<int64_t>
 MetalLayoutAttr::getPhysicalShape(ArrayRef<int64_t> tileShape) const {
+  // DEBUG: Log entry to getPhysicalShape
+  llvm::errs() << "[SHAPE DEBUG] getPhysicalShape:\n";
+  llvm::errs() << "  Logical shape: [";
+  for (size_t i = 0; i < getLogicalShape().size(); ++i) {
+    if (i > 0) llvm::errs() << ", ";
+    llvm::errs() << getLogicalShape()[i];
+  }
+  llvm::errs() << "]\n";
+  llvm::errs() << "  Tile shape: [";
+  for (size_t i = 0; i < tileShape.size(); ++i) {
+    if (i > 0) llvm::errs() << ", ";
+    llvm::errs() << tileShape[i];
+  }
+  llvm::errs() << "]\n";
+
   llvm::SmallVector<int64_t> normalizedIntervals = getNormalizedIntervals();
   llvm::SmallVector<int64_t> physicalShape =
       applyCollapsedIntervalsAndAlignments(
           getLogicalShape(), normalizedIntervals, getDimAlignments());
+
+  // DEBUG: Log shape before tiling
+  llvm::errs() << "  Before tile division: [";
+  for (size_t i = 0; i < physicalShape.size(); ++i) {
+    if (i > 0) llvm::errs() << ", ";
+    llvm::errs() << physicalShape[i];
+  }
+  llvm::errs() << "]\n";
 
   if (!tileShape.empty()) {
     assert(physicalShape.size() >= 2);
@@ -807,6 +859,15 @@ MetalLayoutAttr::getPhysicalShape(ArrayRef<int64_t> tileShape) const {
     assert(physicalShape[physicalShape.size() - 1] % tileShape[1] == 0);
     physicalShape[physicalShape.size() - 1] /= tileShape[1];
   }
+
+  // DEBUG: Log final physical shape
+  llvm::errs() << "  → Physical shape (in tiles): [";
+  for (size_t i = 0; i < physicalShape.size(); ++i) {
+    if (i > 0) llvm::errs() << ", ";
+    llvm::errs() << physicalShape[i];
+  }
+  llvm::errs() << "]\n";
+
   return physicalShape;
 }
 
@@ -815,7 +876,23 @@ MetalLayoutAttr::getPhysicalShape(ArrayRef<int64_t> tileShape) const {
 llvm::SmallVector<int64_t>
 MetalLayoutAttr::getDeviceShape(ArrayRef<int64_t> gridShape,
                                 ArrayRef<int64_t> tileShape) const {
+  // DEBUG: Log entry to getDeviceShape
+  llvm::errs() << "[SHAPE DEBUG] getDeviceShape:\n";
+  llvm::errs() << "  Grid shape: [";
+  for (size_t i = 0; i < gridShape.size(); ++i) {
+    if (i > 0) llvm::errs() << ", ";
+    llvm::errs() << gridShape[i];
+  }
+  llvm::errs() << "]\n";
+
   llvm::SmallVector<int64_t> physicalShape = getPhysicalShape(tileShape);
+  llvm::errs() << "  Physical shape from getPhysicalShape: [";
+  for (size_t i = 0; i < physicalShape.size(); ++i) {
+    if (i > 0) llvm::errs() << ", ";
+    llvm::errs() << physicalShape[i];
+  }
+  llvm::errs() << "]\n";
+
   llvm::SmallVector<int64_t> deviceShape(gridShape);
   deviceShape.reserve(physicalShape.size() * 2);
 
@@ -875,6 +952,29 @@ MetalLayoutAttr::getDeviceShape(ArrayRef<int64_t> gridShape,
            "Collapsed dimension must be evenly divisible by grid dimension");
     deviceShape.push_back(dim / gridShape[i]);
   }
+
+  // DEBUG: Log final device shape
+  llvm::errs() << "  → Device shape: [";
+  for (size_t i = 0; i < deviceShape.size(); ++i) {
+    if (i > 0) llvm::errs() << ", ";
+    llvm::errs() << deviceShape[i];
+  }
+  llvm::errs() << "]";
+  if (deviceShape.size() >= 2) {
+    llvm::errs() << " (grid=[";
+    for (size_t i = 0; i < deviceShape.size() / 2; ++i) {
+      if (i > 0) llvm::errs() << ", ";
+      llvm::errs() << deviceShape[i];
+    }
+    llvm::errs() << "], shard=[";
+    for (size_t i = deviceShape.size() / 2; i < deviceShape.size(); ++i) {
+      if (i > deviceShape.size() / 2) llvm::errs() << ", ";
+      llvm::errs() << deviceShape[i];
+    }
+    llvm::errs() << "])";
+  }
+  llvm::errs() << "\n";
+
   return deviceShape;
 }
 
