@@ -3,9 +3,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "ttmlir/Bindings/Python/TTMLIRModule.h"
+#include "llvm/Support/Signals.h"
+#include <cstdlib>
+
+// Custom signal handler that exits cleanly after stack trace is printed
+static void cleanExitSignalHandler(void *cookie) {
+  // Stack trace has already been printed by LLVM's handler
+  // Just exit cleanly to avoid macOS crash reporter
+  _exit(1);
+}
 
 NB_MODULE(_ttmlir, m) {
   m.doc() = "ttmlir main python extension";
+
+  // Install LLVM signal handlers for stack traces and clean exit
+  llvm::sys::PrintStackTraceOnErrorSignal("");
+  llvm::sys::AddSignalHandler(cleanExitSignalHandler, nullptr);
 
   // Create specialized register_dialects function to be called on site
   // initialize
