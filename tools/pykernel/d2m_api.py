@@ -60,6 +60,10 @@ def create_metal_layout(
     Returns:
         ttcore.MetalLayoutAttr with computed device shape
     """
+    print(f"[SHAPE DEBUG d2m_api.py:41] create_metal_layout called with:")
+    print(f"  logical_shape = {logical_shape} (type: {type(logical_shape)})")
+    print(f"  grid = {grid}")
+    print(f"  tiled = {tiled}")
     from ttmlir.dialects import ttcore
 
     # Convert memory_space string to enum
@@ -537,6 +541,15 @@ def pykernel_gen(
             program = f(*args, **kwargs)
             assert isinstance(program, Program)
 
+            # Inject decorator parameters into program.kwargs so threads receive them
+            # Merge with user-provided kwargs (user kwargs take precedence)
+            injected_program_kwargs = {
+                "grid": grid,
+                "memory_space": memory_space,
+                "tiled": tiled,
+            }
+            program.kwargs = {**injected_program_kwargs, **program.kwargs}
+
             ctx = Context()
             loc = Location.unknown(ctx)
             with ctx, loc:
@@ -597,6 +610,14 @@ def pykernel_gen(
                 )
                 pm = PassManager.parse(pipeline_str)
                 pm.enable_verifier(verify)
+
+                # Enable pass tracking for crash diagnostics
+                try:
+                    from ttmlir._mlir_libs._ttmlir import enable_pretty_stack_traces
+                    enable_pretty_stack_traces(pm._CAPIPtr)
+                except Exception as e:
+                    print(f"Warning: Could not enable pass tracking: {e}")
+
                 print("Running custom pipeline:", pm)
                 if print_ir:
                     print_ir_path = print_ir if isinstance(print_ir, str) else None
@@ -604,8 +625,8 @@ def pykernel_gen(
                     pm.enable_ir_printing(
                         # tree_printing_dir_path=print_ir_path,
                         print_after_all=True,
-                        # print_before_all=True,
-                        # print_after_failure=True,
+                        print_before_all=True,
+                        print_after_failure=True,
                         enable_debug_info=True,
                     )
                 pm.run(module.operation)
