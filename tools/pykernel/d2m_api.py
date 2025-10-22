@@ -310,6 +310,64 @@ def _affine_map_from_lambda(fn):
     return AffineMap.get(num_dims, num_syms, exprs)
 
 
+def _create_stream_layout_for_input(ctx, input_arg, logical_shape, grid, tiled, memory_space):
+    """
+    Create a stream_layout op for the given input argument.
+
+    Key insight from D2M_LAYOUT_ARCHITECTURE.md:
+    - Storage: MetalLayoutAttr WITHOUT index_map (becomes ShardLayoutAttr after bufferization)
+    - Result: MetalLayoutAttr WITH identity index_map (becomes ViewLayoutAttr after bufferization)
+
+    This creates a placeholder storage buffer. The d2m-allocate pass will create
+    new L1 allocations and use the stream as a data source via stream_layout ops.
+    """
+    input_type = input_arg.type
+
+    # Extract layout info from input type
+    input_tensor_type = RankedTensorType(input_type)
+    device_shape = list(input_tensor_type.shape)
+    element_type = input_tensor_type.element_type
+    encoding = input_tensor_type.encoding
+
+    # Verify the input has MetalLayoutAttr
+    metal_layout = ttcore.ir.MetalLayoutAttr.maybe_downcast(encoding)
+    if metal_layout is None:
+        raise RuntimeError("Input argument must have MetalLayoutAttr encoding")
+
+    # Create storage with MetalLayoutAttr WITHOUT index_map
+    # (will become ShardLayoutAttr after bufferization)
+    storage_layout = create_metal_layout(ctx, logical_shape, grid, tiled, memory_space)
+    storage_type = RankedTensorType.get(device_shape, element_type, storage_layout)
+    storage = d2m.EmptyOp(storage_type)
+
+    # Create result with MetalLayoutAttr WITH identity index_map
+    # (will become ViewLayoutAttr after bufferization)
+    # We need to add an identity index_map to the base layout
+    rank = len(device_shape)
+    identity_map = AffineMap.get_identity(rank, ctx)
+
+    # TODO: Expose Python API on MetalLayoutAttr to extract these properties
+    # so we can copy them from the existing metal_layout instead of reconstructing.
+    # For now, we manually reconstruct with the same parameters as create_metal_layout.
+
+    # Create layout with identity index_map using the C++ API signature:
+    # get(ctx, logical_shape, grid, oob_val, mem_space, memory_layout, index_map)
+    result_layout = ttcore.ir.MetalLayoutAttr.get(
+        ctx,
+        logical_shape,
+        grid,  # Second parameter is grid, not dim_alignments!
+        int(ttcore.OOBVal.Undef),
+        int(ttcore.MemorySpace.DeviceL1 if memory_space == "L1" else ttcore.MemorySpace.DeviceDRAM),
+        int(ttcore.TensorMemoryLayout.Sharded),
+        identity_map  # Add identity index_map for view
+    )
+    result_type = RankedTensorType.get(device_shape, element_type, result_layout)
+
+    # Create stream_layout op
+    stream = d2m.StreamLayoutOp(result_type, input_arg, storage.result)
+    return stream.result
+
+
 def _create_generic_func(
     ctx,
     name,
@@ -376,6 +434,25 @@ def _create_generic_func(
     with InsertionPoint(func_bb):
         inputs = func_bb.arguments[:-num_outs]
         outputs = func_bb.arguments[-num_outs:]
+
+        # Extract which inputs are streams from stream_func_arg_attrs
+        is_stream = []
+        for attr in stream_func_arg_attrs[:-num_outs]:  # Exclude outputs
+            attr_dict = DictAttr(attr)
+            stream_attr = attr_dict["d2m.stream"]
+            is_stream.append(BoolAttr(stream_attr).value)
+
+        # Wrap stream inputs with stream_layout ops
+        # Note: user_args contains the original torch tensors with logical shapes
+        wrapped_inputs = [
+            _create_stream_layout_for_input(
+                ctx, inp, list(user_args[i].shape), grid, tiled, memory_space
+            )
+            if is_stream[i]
+            else inp
+            for i, inp in enumerate(inputs)
+        ]
+
         threads = ArrayAttr.get(
             [
                 ct.func_entry.attributes[d2m.ir.ThreadAttr.name]
@@ -384,7 +461,7 @@ def _create_generic_func(
         )
         generic = d2m.GenericOp(
             [ret_type],
-            inputs,
+            wrapped_inputs,  # Use wrapped inputs instead of raw inputs
             outputs,
             ttcore.ir.GridAttr.get(ctx, grid),
             block_factors,
