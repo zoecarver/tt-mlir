@@ -130,7 +130,30 @@ protected:
     }
 
     auto tensorType = mlir::cast<mlir::RankedTensorType>(value.getType());
-    ArrayRef<int64_t> logicalShape = tensorType.getShape();
+
+    // FIXME: This logic for handling existing layouts and rank-2 tensors
+    // is a temporary workaround from stash-hacking-on-layout. Review needed.
+    // Check if tensor already has a MetalLayoutAttr and extract logical shape
+    SmallVector<int64_t> logicalShape;
+    if (auto existingLayout = mlir::dyn_cast_or_null<ttcore::MetalLayoutAttr>(
+            tensorType.getEncoding())) {
+      // Tensor already has a layout - use its logical shape
+      logicalShape = llvm::to_vector(existingLayout.getLogicalShape());
+    } else {
+      // No existing layout - check if this is already a local tensor
+      auto tensorShape = tensorType.getShape();
+
+      // If tensor has rank 2 and small shape, it's likely already a shard - skip layout creation
+      // This handles CircularBuffer contents and other local tensors
+      if (tensorShape.size() == 2) {
+        return value;  // Return unchanged - it's already local
+      }
+
+      // For higher rank tensors without layout, use shape as logical shape
+      logicalShape = SmallVector<int64_t>(tensorType.getShape());
+    }
+
+    ArrayRef<int64_t> logicalShapeRef = logicalShape;
 
     Type elementType = tensorType.getElementType();
     llvm::SmallVector<int64_t> tileShape;
@@ -152,7 +175,7 @@ protected:
       // TODO: Get actual device grid shape from device
       llvm::SmallVector<int64_t> deviceGridShape = {1, 1};
       layout = ttcore::MetalLayoutAttr::get(
-          rewriter.getContext(), logicalShape, deviceGridShape,
+          rewriter.getContext(), logicalShapeRef, deviceGridShape,
           ttcore::OOBVal::Undef, memSpace,
           ttcore::TensorMemoryLayout::Sharded, emptyCollapseIntervals);
 
@@ -160,7 +183,7 @@ protected:
       // TODO: Get actual device grid shape from device
       llvm::SmallVector<int64_t> deviceGridShape = {1, 1};
       layout = ttcore::MetalLayoutAttr::get(
-          rewriter.getContext(), logicalShape, deviceGridShape,
+          rewriter.getContext(), logicalShapeRef, deviceGridShape,
           ttcore::OOBVal::Undef, memSpace,
           ttcore::TensorMemoryLayout::Sharded);
     }
