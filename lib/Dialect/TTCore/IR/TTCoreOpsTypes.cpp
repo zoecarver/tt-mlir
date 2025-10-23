@@ -1626,7 +1626,11 @@ uint64_t TileType::getSizeBytes() const {
     return getHeight() * getWidth() * 2;
   case DataType::UInt8:
     return getHeight() * getWidth();
+  case DataType::Bool:
+    // Booleans are stored as 1 byte per element
+    return getHeight() * getWidth();
   }
+  llvm_unreachable("Unknown DataType");
 }
 
 mlir::Type TileType::getElementType() const {
