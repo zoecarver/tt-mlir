@@ -112,6 +112,9 @@ void createTTIRToTTMetalMiddleendPipeline(
   pm.addPass(createLinalgElementwiseOpFusionPass());
   pm.addPass(mlir::createCanonicalizerPass());
   createTTIRBufferizationPipeline(pm, options);
+  // Add layout attributes to function arguments AFTER bufferization
+  // because one-shot-bufferize strips them
+  pm.addPass(d2m::createD2MBufferizeFunctionArgs());
   pm.addPass(createCanonicalizerPassWithOptions(options));
   pm.addPass(d2m::createD2MInsertExplicitStreams());
   if (options.ttnnMode) {
