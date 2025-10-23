@@ -50,6 +50,11 @@ T alignUp(const T val, const T alignment) {
   return ((val + alignment - 1) / alignment) * alignment;
 }
 
+template <typename T>
+T alignUpDiv(T n, T d) {
+  return (n + d - 1) / d;
+}
+
 template <typename Iter>
 auto product(const Iter begin, const Iter end) ->
     typename std::iterator_traits<Iter>::value_type {
