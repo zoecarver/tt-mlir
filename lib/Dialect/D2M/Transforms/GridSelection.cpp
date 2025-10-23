@@ -212,9 +212,9 @@ static void optimizeToLayoutGrid(d2m::ToLayoutOp toLayoutOp,
       oldLayout.getNormalizedIntervals());
 
   auto newLayout = ttcore::MetalLayoutAttr::get(
-      builder.getContext(), oldLayout.getLogicalShape(), oldLayout.getOobVal(),
-      oldLayout.getMemorySpace(), oldLayout.getMemoryLayout(),
-      collapsedIntervals, newDimAlignments);
+      builder.getContext(), oldLayout.getLogicalShape(), targetGridShape,
+      oldLayout.getOobVal(), oldLayout.getMemorySpace(),
+      oldLayout.getMemoryLayout(), collapsedIntervals, newDimAlignments);
 
   llvm::SmallVector<int64_t> shardedShape = newLayout.getDeviceShape(
       optimalGrid, llvm::ArrayRef(tileShape.data(), tileShape.size()));
@@ -287,7 +287,7 @@ analyzeOperandsAndComputeGrids(d2m::GenericOp genericOp,
         operandLayout.getNormalizedIntervals());
 
     auto tempLayout = ttcore::MetalLayoutAttr::get(
-        builder.getContext(), operandLayout.getLogicalShape(),
+        builder.getContext(), operandLayout.getLogicalShape(), targetGridShape,
         operandLayout.getOobVal(), operandLayout.getMemorySpace(),
         operandLayout.getMemoryLayout(), operandLayout.getCollapsedIntervals(),
         targetAlignments);
@@ -328,8 +328,8 @@ analyzeOperandsAndComputeGrids(d2m::GenericOp genericOp,
 
           auto inputTempLayout = ttcore::MetalLayoutAttr::get(
               builder.getContext(), inputLayout.getLogicalShape(),
-              inputLayout.getOobVal(), inputLayout.getMemorySpace(),
-              inputLayout.getMemoryLayout(),
+              targetGridShape, inputLayout.getOobVal(),
+              inputLayout.getMemorySpace(), inputLayout.getMemoryLayout(),
               inputLayout.getCollapsedIntervals(), inputAlignments);
 
           llvm::SmallVector<int64_t> inputPhysShape =
