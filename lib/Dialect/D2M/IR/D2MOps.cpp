@@ -1026,7 +1026,8 @@ static mlir::LogicalResult verifyAffineBlocking(
 
 // GenericOp verification
 ::mlir::LogicalResult d2m::GenericOp::verify() {
-  if (hasPureTensorSemantics()) {
+  // Multi-region generics are allowed when using explicit block_factors (no indexing maps)
+  if (hasPureTensorSemantics() && getIndexingMaps().size() > 0) {
     if (this->getNumRegions() != 1) {
       return emitOpError(
           "generic op with pure tensor semantics must have exactly 1 region");
