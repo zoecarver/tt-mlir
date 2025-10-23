@@ -52,6 +52,8 @@ void createTTIRBufferizationPipeline(
       bufferization::LayoutMapOption::IdentityLayoutMap;
   bufferizePassOptions.unknownTypeConversion =
       bufferization::LayoutMapOption::IdentityLayoutMap;
+  // Preserve layout attributes through bufferization
+  pm.addPass(mlir::tt::d2m::createD2MBufferizeFunctionArgs());
   pm.addPass(
       mlir::bufferization::createOneShotBufferizePass(bufferizePassOptions));
   // TODO(#2246)

@@ -28,6 +28,30 @@ def D2MElementwiseFusion : Pass<"d2m-elementwise-fusion", "::mlir::ModuleOp"> {
   ];
 }
 
+def D2MBufferizeFunctionArgs : Pass<"d2m-bufferize-function-args", "::mlir::ModuleOp"> {
+  let summary = "Manually bufferize function arguments to preserve layout attributes";
+  let description = [{
+    This pass runs BEFORE one-shot-bufferize to manually convert tensor function
+    arguments to memref types while preserving layout attributes (ViewLayoutAttr,
+    ShardLayoutAttr) and memory space attributes.
+
+    The standard bufferization pass with IdentityLayoutMap option strips all
+    layout information from function boundaries. This pass ensures that:
+    1. Function arguments marked with d2m.stream=true become memrefs with ViewLayoutAttr
+    2. Non-stream function arguments become memrefs with ShardLayoutAttr (if needed)
+    3. Memory space attributes from MetalLayoutAttr are preserved
+
+    This prevents downstream crashes in passes like d2m-allocate that expect
+    memory space attributes on all memrefs.
+  }];
+
+  let dependentDialects = [
+    "::mlir::tt::d2m::D2MDialect",
+    "::mlir::tt::ttcore::TTCoreDialect",
+    "::mlir::memref::MemRefDialect"
+  ];
+}
+
 def D2MSFPUTileLoopFission : Pass<"d2m-sfpu-tile-loop-fission", "::mlir::ModuleOp"> {
   let summary = "Perform loop fission inside d2m.generic compute regions for load→compute→store triplets";
   let description = [{
