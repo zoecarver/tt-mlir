@@ -811,7 +811,9 @@ void d2m::GenericOp::build(mlir::OpBuilder &builder,
                            ArrayAttr iteratorTypes, ThreadType singleThreadType,
                            ttcore::GridAttr grid,
                            ArrayRef<int64_t> blockFactors) {
-  TT_assertv(!indexingMaps.empty(), "expected non-empty indexing maps");
+  // FIXME: Pykernel DSL uses explicit block_factors with empty indexing_maps.
+  // This is valid: hasExplicitBlockFactors() = indexingMaps.empty() && !blockFactors.empty()
+  // TT_assertv(!indexingMaps.empty(), "expected non-empty indexing maps");
   TT_assertv(outputs.size() == 1u, "expected single output");
 
   if (!grid) {
