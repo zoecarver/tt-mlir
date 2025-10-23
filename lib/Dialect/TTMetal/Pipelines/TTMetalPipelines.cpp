@@ -52,10 +52,10 @@ void createTTIRBufferizationPipeline(
       bufferization::LayoutMapOption::IdentityLayoutMap;
   bufferizePassOptions.unknownTypeConversion =
       bufferization::LayoutMapOption::IdentityLayoutMap;
-  // Preserve layout attributes through bufferization
-  pm.addPass(mlir::tt::d2m::createD2MBufferizeFunctionArgs());
   pm.addPass(
       mlir::bufferization::createOneShotBufferizePass(bufferizePassOptions));
+  // Restore layout attributes on function args after bufferization strips them
+  pm.addPass(mlir::tt::d2m::createD2MBufferizeFunctionArgs());
   // TODO(#2246)
   // bufferization::BufferDeallocationPipelineOptions
   // bufferDeallocationOptions;
