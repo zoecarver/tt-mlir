@@ -422,12 +422,13 @@ updateStreamLayoutOps(ArrayRef<StreamLayoutUpdateInfo> streamLayoutsToUpdate,
         streamLayout.getLoc(), newStorageEmpty.getType(),
         streamLayout.getInput(), newStorageEmpty);
 
-    // We expect the StreamLayout to be used only by the GenericOp we're
-    // optimizing. Assert this assumption to catch unexpected sharing.
-    assert(streamLayout.getResult().hasOneUse() &&
-           "StreamLayout should only be used by the GenericOp being optimized");
+    // Replace uses of old StreamLayout with the new one.
+    // Note: In pykernel DSL, stream_layouts may be shared between multiple generics,
+    // so we can't assert hasOneUse here.
     streamLayout.getResult().replaceAllUsesWith(newStreamLayout.getResult());
-    streamLayout.erase();
+    if (streamLayout.use_empty()) {
+      streamLayout.erase();
+    }
 
     if (storageEmpty.use_empty()) {
       storageEmpty.erase();
