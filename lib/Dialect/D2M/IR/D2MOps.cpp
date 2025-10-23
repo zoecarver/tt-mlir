@@ -937,14 +937,6 @@ bool d2m::GenericOp::isWritable(mlir::Value value,
          mlir::isa<mlir::BlockArgument>(value);
 }
 
-bool d2m::GenericOp::hasTensorSemantics() {
-  auto isaTensor = [](Type t) { return isa<bufferization::TensorLikeType>(t); };
-  if (any_of(getResultTypes(), isaTensor)) {
-    return true;
-  }
-  return any_of(getOperandTypes(), isaTensor);
-}
-
 static std::optional<int64_t>
 isNotEqualOrBroadcast(mlir::ArrayRef<int64_t> as, mlir::ArrayRef<int64_t> bs) {
   for (auto [dim, a, b] : llvm::enumerate(as, bs)) {
@@ -1316,7 +1308,10 @@ unsigned d2m::GenericOp::getNumDims() {
       .getNumDims();
 }
 
-mlir::AffineMap d2m::GenericOp::getIndexingMap(int64_t operandIndex) {
+std::optional<mlir::AffineMap> d2m::GenericOp::getIndexingMap(int64_t operandIndex) {
+  if (getIndexingMaps().empty()) {
+    return std::nullopt;
+  }
   return mlir::cast<AffineMapAttr>(getIndexingMaps()[operandIndex]).getValue();
 }
 
@@ -1427,7 +1422,11 @@ mlir::SmallVector<int64_t> d2m::GenericOp::getLoopBounds() {
 
 mlir::SmallVector<int64_t>
 d2m::GenericOp::getParticipatingLoopDims(int64_t operandIndex) {
-  AffineMap indexingMap = getIndexingMap(operandIndex);
+  std::optional<AffineMap> indexingMapOpt = getIndexingMap(operandIndex);
+  if (!indexingMapOpt) {
+    return {};
+  }
+  AffineMap indexingMap = *indexingMapOpt;
   auto dimExprs =
       llvm::make_filter_range(indexingMap.getResults(), [](AffineExpr expr) {
         return mlir::isa<AffineDimExpr>(expr);
@@ -1439,7 +1438,11 @@ d2m::GenericOp::getParticipatingLoopDims(int64_t operandIndex) {
 
 mlir::SmallVector<int64_t>
 d2m::GenericOp::getNonParticipatingLoopDims(int64_t operandIndex) {
-  AffineMap indexingMap = getIndexingMap(operandIndex);
+  std::optional<AffineMap> indexingMapOpt = getIndexingMap(operandIndex);
+  if (!indexingMapOpt) {
+    return {};
+  }
+  AffineMap indexingMap = *indexingMapOpt;
   SmallVector<int64_t> participatingDims =
       getParticipatingLoopDims(operandIndex);
   llvm::BitVector nonParticipatingDims(indexingMap.getNumDims(), true);
