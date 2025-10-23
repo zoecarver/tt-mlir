@@ -1243,9 +1243,28 @@ void GenericOp::getCanonicalizationPatterns(mlir::RewritePatternSet &patterns,
           }
 
           Operation *origDefiningOp = initOperand.get().getDefiningOp();
-          if (origDefiningOp &&
-              !mlir::isa<EmptyOp, mlir::tensor::EmptyOp>(origDefiningOp)) {
+          if (origDefiningOp && (!mlir::isa<EmptyOp>(origDefiningOp) &&
+              !mlir::isa<memref::AllocOp>(origDefiningOp))) {
             return false;
+          }
+
+          // Don't canonicalize operations that need to use the tensor created
+          // by d2m.empty(), not the result of pop/reserve
+          if (mlir::isa<d2m::TileMatmulBlockOp>(regionOp)) {
+            return false;
+          }
+
+
+          // Don't canonicalize output operands of operations that use the
+          // tensor as an output (such as linalg.generic)
+          if (DestinationStyleOpInterface dps =
+              mlir::dyn_cast<DestinationStyleOpInterface>(regionOp)) {
+            if (llvm::any_of(dps.getDpsInitsMutable(),
+                            [&](OpOperand &outputOperand) {
+                              return &initOperand == &outputOperand;
+                            })) {
+              return false;
+            }
           }
 
           blockArg = region.getArgument(dpsIOBoundary);
