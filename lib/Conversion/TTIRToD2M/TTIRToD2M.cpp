@@ -100,9 +100,12 @@ protected:
     dimAlignments[dimAlignments.size() - 1] = 32;
     dimAlignments[dimAlignments.size() - 2] = 32;
 
+    // TODO: Get actual device grid shape from device
+    llvm::SmallVector<int64_t> deviceGridShape = {1, 1};
     auto metalLayout = ttcore::MetalLayoutAttr::get(
-        rewriter.getContext(), tensorType.getShape(), ttcore::OOBVal::Undef,
-        memSpace, memLayout, collapsedIntervals, dimAlignments);
+        rewriter.getContext(), tensorType.getShape(), deviceGridShape,
+        ttcore::OOBVal::Undef, memSpace, memLayout, collapsedIntervals,
+        dimAlignments);
 
     llvm::SmallVector<int64_t> unshardedShape =
         metalLayout.getPhysicalShape(ttcore::TileType::getDefaultShape());
@@ -146,13 +149,19 @@ protected:
       DenseIntElementsAttr emptyCollapseIntervals =
           DenseIntElementsAttr::get(emptyIntervalType, ArrayRef<int64_t>{});
 
+      // TODO: Get actual device grid shape from device
+      llvm::SmallVector<int64_t> deviceGridShape = {1, 1};
       layout = ttcore::MetalLayoutAttr::get(
-          rewriter.getContext(), logicalShape, ttcore::OOBVal::Undef, memSpace,
+          rewriter.getContext(), logicalShape, deviceGridShape,
+          ttcore::OOBVal::Undef, memSpace,
           ttcore::TensorMemoryLayout::Sharded, emptyCollapseIntervals);
 
     } else {
+      // TODO: Get actual device grid shape from device
+      llvm::SmallVector<int64_t> deviceGridShape = {1, 1};
       layout = ttcore::MetalLayoutAttr::get(
-          rewriter.getContext(), logicalShape, ttcore::OOBVal::Undef, memSpace,
+          rewriter.getContext(), logicalShape, deviceGridShape,
+          ttcore::OOBVal::Undef, memSpace,
           ttcore::TensorMemoryLayout::Sharded);
     }
 
@@ -367,7 +376,7 @@ private:
     assert(numOperands == op->getNumOperands());
 
     const std::size_t physicalRank =
-        ttcore::getDeviceLayout(outputs[0]).getRank() / 2;
+        mlir::cast<ShapedType>(outputs[0].getType()).getRank();
 
     SmallVector<mlir::AffineMap> indexingMaps =
         getAffineMapsArray(rewriter, numOperands, physicalRank);
@@ -489,7 +498,7 @@ private:
     assert((numOperands - 1) == op->getNumOperands());
 
     const std::size_t physicalRank =
-        ttcore::getDeviceLayout(outputs[0]).getRank() / 2;
+        mlir::cast<ShapedType>(outputs[0].getType()).getRank();
 
     SmallVector<mlir::AffineMap> indexingMaps =
         getAffineMapsArray(rewriter, op, numOperands, physicalRank);
@@ -721,7 +730,7 @@ private:
     assert(numOperands == op->getNumOperands());
 
     const std::size_t physicalRank =
-        ttcore::getDeviceLayout(outputs[0]).getRank() / 2;
+        mlir::cast<ShapedType>(outputs[0].getType()).getRank();
 
     // TODO(#2591) handle 'transpose_{a,b}' attributes.
 
