@@ -1339,6 +1339,13 @@ mlir::SmallVector<int64_t> d2m::GenericOp::getBlockFactorsValue() {
 
 mlir::SmallVector<int64_t> d2m::GenericOp::getFullBlockFactors() {
   auto maps = getIndexingMapsValue();
+
+  // FIXME: Handle explicit block_factors mode (empty indexing_maps).
+  // For now, return the block factors as-is when indexing_maps is empty.
+  if (maps.empty()) {
+    return getBlockFactorsValue();
+  }
+
   // Priority doesn't matter here, so reverse can be false.
   auto flatInverseMap =
       utils::concatInversePermutationMap(maps, /*reverse=*/false);
