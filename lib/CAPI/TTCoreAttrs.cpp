@@ -130,9 +130,12 @@ MlirAttribute ttmlirTTMetalLayoutAttrGet(MlirContext ctx, intptr_t logicalRank,
                                          unsigned memorySpace) {
 
   llvm::ArrayRef<int64_t> logicalShapeRef(logicalShape, logicalRank);
+  // TODO: Properly construct deviceGridShape from gridRank
+  llvm::SmallVector<int64_t> deviceGridShape = {1, 1};
 
   return wrap(MetalLayoutAttr::get(
-      unwrap(ctx), logicalShapeRef, static_cast<OOBVal>(oobVal),
+      unwrap(ctx), logicalShapeRef, deviceGridShape,
+      static_cast<OOBVal>(oobVal),
       static_cast<MemorySpace>(memorySpace), TensorMemoryLayout::Sharded));
 }
 
