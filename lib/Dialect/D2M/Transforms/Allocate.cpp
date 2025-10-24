@@ -362,9 +362,11 @@ class D2MAllocate final : public impl::D2MAllocateBase<D2MAllocate> {
 
       // Copy liveness results into our alloc set.
       if (memref::AllocOp allocOp = llvm::dyn_cast<memref::AllocOp>(op)) {
-        TT_assertv(!allocOp->use_empty(),
-                   "didn't expect an alloc op without uses: {}",
-                   asOperand(allocOp));
+        // FIXME: Skip dead allocs created by bufferization (e.g., temporary matmul results)
+        // A proper fix would be to run DCE before this pass
+        if (allocOp->use_empty()) {
+          continue;
+        }
 
         MemrefValueContext &memrefCtx = analysis.memrefs[allocOp];
 
