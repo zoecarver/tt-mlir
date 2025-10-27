@@ -58,6 +58,17 @@ set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Enable Clang modules for faster compilation
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(
+    -fmodules
+    -fimplicit-module-maps
+    -fmodules-cache-path=${CMAKE_BINARY_DIR}/ModuleCache
+  )
+  # Prune module cache: check daily, remove entries older than 4 days
+  add_compile_options(-fmodules-prune-interval=86400 -fmodules-prune-after=345600)
+endif()
+
 set(TTMLIR_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "Enable Python bindings")
 
 if (APPLE)

@@ -15,6 +15,11 @@ if (TTMLIR_ENABLE_RUNTIME_TESTS)
   list(APPEND TTMLIR_RUNTIME_PYTHON_SRCS runtime/test.cpp)
 endif()
 
+# Add macOS stubs when runtime is disabled
+if (APPLE AND NOT TTMLIR_ENABLE_RUNTIME)
+  list(APPEND TTMLIR_RUNTIME_PYTHON_SRCS runtime/stubs_macos.cpp)
+endif()
+
 nanobind_add_module(
   _ttmlir_runtime
   ${TTMLIR_RUNTIME_PYTHON_SRCS}
@@ -30,7 +35,6 @@ target_include_directories(_ttmlir_runtime
   PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${PROJECT_SOURCE_DIR}/runtime/include
-  ${PROJECT_BINARY_DIR}/runtime/include
   ${PROJECT_BINARY_DIR}/include/ttmlir/Target/Common
 )
 
@@ -57,7 +61,6 @@ if (TTMLIR_ENABLE_RUNTIME)
     SYSTEM PRIVATE ${pybind11_INCLUDE_DIRS}
     PRIVATE
       ${PROJECT_SOURCE_DIR}/runtime/include
-      ${PROJECT_BINARY_DIR}/runtime/include
       ${PROJECT_BINARY_DIR}/include/ttmlir/Target/Common
       ${PROJECT_SOURCE_DIR}/runtime/python/include
   )
