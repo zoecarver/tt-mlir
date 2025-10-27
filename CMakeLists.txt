@@ -59,17 +59,6 @@ set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Enable Clang modules for faster compilation
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(
-    -fmodules
-    -fimplicit-module-maps
-    -fmodules-cache-path=${CMAKE_BINARY_DIR}/ModuleCache
-  )
-  # Prune module cache: check daily, remove entries older than 4 days
-  add_compile_options(-fmodules-prune-interval=86400 -fmodules-prune-after=345600)
-endif()
-
 set(TTMLIR_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "Enable Python bindings")
 
 if (APPLE)
@@ -94,26 +83,11 @@ endif()
 
 add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter --system-header-prefix=ENV{TTMLIR_TOOLCHAIN_DIR})
 
-set(CMAKE_LINKER_TYPE DEFAULT)
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE CLANG_VERSION_INFO ERROR_QUIET)
-  string(REGEX MATCH "version ([0-9]+)\\.[0-9]+" CLANG_VERSION "${CLANG_VERSION_INFO}")
-  set(CLANG_VERSION_MAJOR ${CMAKE_MATCH_1})
-  set(LD_LLD_EXECUTABLE_VERSIONED "ld.lld-${CLANG_VERSION_MAJOR}")
-  find_program(LLD NAMES ${LD_LLD_EXECUTABLE_VERSIONED} ld.lld)
-  if(LLD)
-    execute_process(COMMAND ${LLD} --version OUTPUT_VARIABLE LLD_VERSION_INFO ERROR_QUIET)
-    string(REGEX MATCH "LLD ([0-9]+)\\.[0-9]+" LLD_VERSION "${LLD_VERSION_INFO}")
-    set(LLD_VERSION_MAJOR ${CMAKE_MATCH_1})
-    if (CLANG_VERSION_MAJOR EQUAL LLD_VERSION_MAJOR)
-      message(STATUS "Using LLD linker: ${LLD}")
-      set(CMAKE_LINKER_TYPE LLD)
-      # Enable parallel linking with LLD using all available cores
-      cmake_host_system_information(RESULT CPU_CORES QUERY NUMBER_OF_LOGICAL_CORES)
-      add_link_options(-Wl,--threads=${CPU_CORES})
-      message(STATUS "LLD parallel linking enabled with ${CPU_CORES} threads")
-    endif()
-  endif()
+# Enable parallel linking if LLD is explicitly requested
+if(CMAKE_LINKER_TYPE STREQUAL "LLD")
+  cmake_host_system_information(RESULT CPU_CORES QUERY NUMBER_OF_LOGICAL_CORES)
+  add_link_options(-Wl,--threads=${CPU_CORES})
+  message(STATUS "LLD parallel linking enabled with ${CPU_CORES} threads")
 endif()
 
 include(TTMLIRBuildTypes)

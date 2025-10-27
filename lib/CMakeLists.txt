@@ -3,6 +3,17 @@ if (CODE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage")
 endif()
 
+# Enable Clang modules for faster compilation (lib/ only, not Python bindings)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(
+    -fmodules
+    -fimplicit-module-maps
+    -fmodules-cache-path=${CMAKE_BINARY_DIR}/ModuleCache
+  )
+  # Prune module cache: check daily, remove entries older than 4 days
+  add_compile_options(-fmodules-prune-interval=86400 -fmodules-prune-after=345600)
+endif()
+
 include_directories(${TTMLIR_TOOLCHAIN_DIR}/src/stablehlo)
 include_directories(${TTMLIR_TOOLCHAIN_DIR}/src/stablehlo-build)
 
