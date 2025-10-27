@@ -1,3 +1,11 @@
+# Reduce debug info on macOS for faster linking
+if(APPLE AND TTMLIR_REDUCE_DEBUG_INFO)
+  set(CMAKE_CXX_FLAGS_DEBUG "-g -gline-tables-only" CACHE STRING
+      "Flags used by the C++ compiler for Debug build type or configuration." FORCE)
+  set(CMAKE_C_FLAGS_DEBUG "-g -gline-tables-only" CACHE STRING
+      "Flags used by the C compiler for Debug build type or configuration." FORCE)
+endif()
+
 # Asan build type
 
 # Find the Asan runtime library path

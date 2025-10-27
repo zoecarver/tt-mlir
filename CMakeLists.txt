@@ -23,6 +23,7 @@ option(TTMLIR_ENABLE_OPMODEL_TESTS "Enable OpModel tests" ON)
 option(TTMLIR_ENABLE_SHARED_LIB "Enable Shared lib building" ON)
 option(TTMLIR_ENABLE_EXPLORER "Enable cloning and building the explorer tool" ON)
 option(CODE_COVERAGE "Enable coverage reporting" OFF)
+option(TTMLIR_REDUCE_DEBUG_INFO "Use line tables only for debug info on macOS (faster builds)" ON)
 
 if (TTMLIR_ENABLE_RUNTIME)
   option(TT_RUNTIME_ENABLE_TTNN "Enable TTNN Runtime (requires TTMLIR_ENABLE_RUNTIME)" ON)
