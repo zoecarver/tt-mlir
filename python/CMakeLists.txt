@@ -119,20 +119,8 @@ declare_mlir_python_extension(TTMLIRPythonExtensions.Main
     TTMLIRCAPI
   PRIVATE_LINK_LIBS
     TTMLIRCompiler
-    MLIRArmNeonToLLVMIRTranslation
-    MLIRArmSMEToLLVMIRTranslation
-    MLIRArmSVEToLLVMIRTranslation
     MLIRBuiltinToLLVMIRTranslation
-    MLIRGPUToLLVMIRTranslation
     MLIRLLVMToLLVMIRTranslation
-    MLIRNVVMToLLVMIRTranslation
-    MLIROpenACCToLLVMIRTranslation
-    MLIROpenMPToLLVMIRTranslation
-    MLIRROCDLToLLVMIRTranslation
-    MLIRSPIRVToLLVMIRTranslation
-    MLIRTestToLLVMIRTranslation
-    MLIRVCIXToLLVMIRTranslation
-    MLIRX86VectorTransforms
   PYTHON_BINDINGS_LIBRARY nanobind
 )
 

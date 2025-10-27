@@ -4,7 +4,8 @@
 
 #include "mlir/InitAllTranslations.h"
 #include "mlir/Target/Cpp/CppEmitter.h"
-#include "mlir/Target/LLVMIR/Dialect/All.h"
+#include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
+#include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 
 #include "ttmlir/Bindings/Python/TTMLIRModule.h"
 #include "ttmlir/Conversion/Passes.h"
@@ -233,8 +234,9 @@ void populatePassesModule(nb::module_ &m) {
           // translations
           mlir::DialectRegistry registry;
 
-          // Register all LLVM IR translations
-          registerAllToLLVMIRTranslations(registry);
+          // Register only required LLVM IR translations
+          registerBuiltinDialectTranslation(registry);
+          registerLLVMDialectTranslation(registry);
 
           // Apply the registry to the module's context
           moduleOp->getContext()->appendDialectRegistry(registry);
@@ -268,8 +270,9 @@ void populatePassesModule(nb::module_ &m) {
           // translations
           mlir::DialectRegistry registry;
 
-          // Register all LLVM IR translations
-          registerAllToLLVMIRTranslations(registry);
+          // Register only required LLVM IR translations
+          registerBuiltinDialectTranslation(registry);
+          registerLLVMDialectTranslation(registry);
 
           // Apply the registry to the module's context
           moduleOp->getContext()->appendDialectRegistry(registry);
@@ -293,8 +296,9 @@ void populatePassesModule(nb::module_ &m) {
     // translations
     mlir::DialectRegistry registry;
 
-    // Register all LLVM IR translations
-    registerAllToLLVMIRTranslations(registry);
+    // Register only required LLVM IR translations
+    registerBuiltinDialectTranslation(registry);
+    registerLLVMDialectTranslation(registry);
 
     // Apply the registry to the module's context
     moduleOp->getContext()->appendDialectRegistry(registry);
@@ -310,8 +314,9 @@ void populatePassesModule(nb::module_ &m) {
     // translations
     mlir::DialectRegistry registry;
 
-    // Register all LLVM IR translations
-    registerAllToLLVMIRTranslations(registry);
+    // Register only required LLVM IR translations
+    registerBuiltinDialectTranslation(registry);
+    registerLLVMDialectTranslation(registry);
 
     // Apply the registry to the module's context
     moduleOp->getContext()->appendDialectRegistry(registry);
@@ -326,8 +331,9 @@ void populatePassesModule(nb::module_ &m) {
     // translations
     mlir::DialectRegistry registry;
 
-    // Register all LLVM IR translations
-    registerAllToLLVMIRTranslations(registry);
+    // Register only required LLVM IR translations
+    registerBuiltinDialectTranslation(registry);
+    registerLLVMDialectTranslation(registry);
 
     // Apply the registry to the module's context
     moduleOp->getContext()->appendDialectRegistry(registry);
