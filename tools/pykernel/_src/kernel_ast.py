@@ -506,11 +506,12 @@ class TTCompilerBase(PyKernelAstBase):
         if isinstance(rhs, OpView):
             rhs = rhs.result
 
-        if isinstance(lhs.type, memref.MemRefType):
+        # Check if we have values with types (not operations)
+        if hasattr(lhs, 'type') and isinstance(lhs.type, memref.MemRefType):
             lhs = memref.LoadOp(
                 lhs, arith.ConstantOp(IndexType.get(self.ctx), 0)
             ).result
-        if isinstance(rhs.type, memref.MemRefType):
+        if hasattr(rhs, 'type') and isinstance(rhs.type, memref.MemRefType):
             rhs = memref.LoadOp(
                 rhs, arith.ConstantOp(IndexType.get(self.ctx), 0)
             ).result
@@ -540,9 +541,12 @@ class TTCompilerBase(PyKernelAstBase):
             case ast.MatMult():
                 return qualified_or("__matmul__", unimplemented, lhs, rhs)
             case ast.FloorDiv():
-                return qualified_or("__floordiv__", arith.floordivsi, lhs, rhs)
+                # Use unsigned division for non-negative integers (tile indices)
+                # divui is better supported in TTKernel than floordivsi
+                return qualified_or("__floordiv__", arith.divui, lhs, rhs)
             case ast.Mod():
-                return qualified_or("__mod__", arith.remsi, lhs, rhs)
+                # Use unsigned remainder for non-negative integers (tile indices)
+                return qualified_or("__mod__", arith.remui, lhs, rhs)
             case ast.Pow():
                 return qualified_or("__pow__", unimplemented, lhs, rhs)
             case ast.LShift():
