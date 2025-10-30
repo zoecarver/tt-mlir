@@ -874,10 +874,14 @@ class TTKernelCompiler(TTCompilerBase):
     def _wrap_noc_async_read_tile(self, tile_id, addr_gen, dst_addr):
         """Wrapper for noc_async_read_tile that casts tile_id from index to i32."""
         from ttmlir.dialects import arith
-        from ttmlir.ir import IndexType, IntegerType
+        from ttmlir.ir import IndexType, IntegerType, OpView
+
+        # Extract result from operations like LoadOp
+        if isinstance(tile_id, OpView):
+            tile_id = tile_id.result
 
         # Cast tile_id from index to i32 if needed
-        if isinstance(tile_id.type, IndexType):
+        if hasattr(tile_id, 'type') and isinstance(tile_id.type, IndexType):
             i32_type = IntegerType.get_signless(32)
             tile_id = arith.index_cast(i32_type, tile_id)
 
@@ -885,8 +889,13 @@ class TTKernelCompiler(TTCompilerBase):
 
     def _wrap_noc_async_write_tile(self, tile_id, addr_gen, src_addr):
         """Wrapper for noc_async_write_tile that accepts both index and i32."""
+        from ttmlir.ir import OpView
+
+        # Extract result from operations like LoadOp
+        if isinstance(tile_id, OpView):
+            tile_id = tile_id.result
+
         # This operation accepts IndexLike, so it should work with both types
-        # But for consistency, we can keep it as-is
         return ttkernel.noc_async_write_tile(tile_id, addr_gen, src_addr)
 
     # Root Nodes
