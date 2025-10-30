@@ -863,6 +863,28 @@ class TTKernelCompiler(TTCompilerBase):
             [True, True],
         )  # True for arg as attribute
 
+        # Add wrappers for NOC operations that need type casting
+        self._fn_map["noc_async_read_tile"] = self._wrap_noc_async_read_tile
+        self._fn_map["noc_async_write_tile"] = self._wrap_noc_async_write_tile
+
+    def _wrap_noc_async_read_tile(self, tile_id, addr_gen, dst_addr):
+        """Wrapper for noc_async_read_tile that casts tile_id from index to i32."""
+        from ttmlir.dialects import arith
+        from ttmlir.ir import IndexType, IntegerType
+
+        # Cast tile_id from index to i32 if needed
+        if isinstance(tile_id.type, IndexType):
+            i32_type = IntegerType.get_signless(32)
+            tile_id = arith.index_cast(i32_type, tile_id)
+
+        return ttkernel.noc_async_read_tile(tile_id, addr_gen, dst_addr)
+
+    def _wrap_noc_async_write_tile(self, tile_id, addr_gen, src_addr):
+        """Wrapper for noc_async_write_tile that accepts both index and i32."""
+        # This operation accepts IndexLike, so it should work with both types
+        # But for consistency, we can keep it as-is
+        return ttkernel.noc_async_write_tile(tile_id, addr_gen, src_addr)
+
     # Root Nodes
     def visit_FunctionDef(self, node):
         # TODO: add alloca args name into symbol table
